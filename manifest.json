@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "MPG – Bannière dynamique",
+  "version": "1.6.0",
+  "description": "Bandeaux mosaïque animés par page, thème ardoise et correctifs UX / accessibilité sur mpg.football.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "alarms"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MPG – Bannière dynamique"
+  },
+  "background": {
+    "service_worker": "autoreload.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mpg.football/*"
+      ],
+      "js": [
+        "theme.js",
+        "banner.js",
+        "fixes.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
