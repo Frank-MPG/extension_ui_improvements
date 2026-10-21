@@ -78,6 +78,47 @@
     }
     [data-mpg-more] { margin-top: 8px !important; }
 
+    /* --- Cartes de compétition sans image de fond : fond fabriqué (Mon MPG) ---
+       ::before : teinte du championnat (de gauche, neutre, vers la droite, colorée)
+                  + motif selon le type : ligue = rayures, tournoi = anneaux, express = traits serrés
+       ::after  : logo du championnat en filigrane (l'image carrée colorée est réduite à son
+                  logo : noir et blanc très contrasté, puis fusion « screen » qui efface le noir)
+       Compétition terminée / à relancer / éliminé : fond désaturé et atténué. */
+    [data-mpg-champbg]::before, [data-mpg-champbg]::after {
+      content: ""; position: absolute; z-index: -1; pointer-events: none;
+    }
+    [data-mpg-champbg]::before {
+      inset: 0;
+      background:
+        var(--mpg-cb-pattern),
+        radial-gradient(120% 140% at 100% 100%,
+          color-mix(in srgb, var(--mpg-cb-c) 46%, transparent) 0%,
+          color-mix(in srgb, var(--mpg-cb-c) 14%, transparent) 55%, transparent 80%);
+    }
+    [data-mpg-champbg]::after {
+      width: var(--mpg-cb-size, 190px); height: var(--mpg-cb-size, 190px);
+      right: var(--mpg-cb-right, -34px); bottom: var(--mpg-cb-bottom, -46px);
+      background: var(--mpg-cb-img) center / contain no-repeat;
+      transform: rotate(-12deg); opacity: .17; mix-blend-mode: screen;
+      filter: grayscale(1) var(--mpg-cb-inv, ) brightness(.6) contrast(8);
+    }
+    [data-mpg-champbg][data-mpg-cb-inv]::after { --mpg-cb-inv: invert(1); }
+    [data-mpg-cb-kind="league"]     { --mpg-cb-pattern: repeating-linear-gradient(135deg, rgba(255, 255, 255, .035) 0 2px, transparent 2px 13px); }
+    [data-mpg-cb-kind="tournament"] { --mpg-cb-pattern: repeating-radial-gradient(circle at 100% 100%, rgba(255, 255, 255, .045) 0 1.5px, transparent 1.5px 15px); }
+    [data-mpg-cb-kind="express"]    { --mpg-cb-pattern: repeating-linear-gradient(105deg, rgba(255, 255, 255, .04) 0 1.5px, transparent 1.5px 7px); }
+    /* Cartes publiques (avatar centré en haut) : filigrane en haut à droite */
+    [data-mpg-champbg="public"] { --mpg-cb-size: 150px; --mpg-cb-right: -36px; --mpg-cb-bottom: auto; }
+    [data-mpg-champbg="public"]::after { top: -34px; }
+    [data-mpg-cb-done]::before { filter: grayscale(1); opacity: .55; }
+    [data-mpg-cb-done]::after { opacity: .08; }
+    /* Thème clair : teinte plus légère, motif et logo sombres */
+    html.light [data-mpg-champbg]::before { opacity: .55; }
+    html.light [data-mpg-cb-kind] { --mpg-cb-pattern: repeating-linear-gradient(135deg, rgba(0, 0, 0, .03) 0 2px, transparent 2px 13px); }
+    html.light [data-mpg-champbg]::after {
+      opacity: .1; mix-blend-mode: multiply;
+      filter: grayscale(1) var(--mpg-cb-inv, ) brightness(.6) contrast(8) invert(1);
+    }
+
     /* --- Cartes cliquables : retour visuel au survol --- */
     [data-mpg-card] { transition: filter .15s, box-shadow .15s; }
     [data-mpg-card]:hover { filter: brightness(1.18); box-shadow: 0 0 0 1px rgba(255, 255, 255, .18); }
@@ -427,7 +468,11 @@
 
   function fixElement(el) {
     const tag = el.tagName;
-    if (tag === 'IMG') { if (!el.hasAttribute('alt')) el.setAttribute('alt', ''); return; }
+    if (tag === 'IMG') {
+      if (!el.hasAttribute('alt')) el.setAttribute('alt', '');
+      if (CHAMP_IMG.test(el.src)) champBackground(el);
+      return;
+    }
     if (tag === 'H5' && !el.hasAttribute('aria-level')) el.setAttribute('aria-level', '2');
     if (tag === 'H6' && !el.hasAttribute('aria-level')) el.setAttribute('aria-level', '3');
     if (tag !== 'DIV') return;
@@ -477,6 +522,43 @@
 
     cornerBadge(el, c);
     detectSwitch(el, c);
+  }
+
+  // Carte de compétition sans image de fond : fond fabriqué à partir du championnat
+  // (logo et couleur), du type (ligue, tournoi, express) et de l'état (terminée…).
+  // Repérée par le logo du championnat (« trophy-XX-coloredBackground ») ; les cartes qui
+  // ont déjà une illustration (image qui couvre la carte) sont laissées telles quelles.
+  // Les logos sont servis sans CORS : pas de lecture de pixels, d'où les couleurs ci-dessous
+  // (relevées sur les logos ; inv = logo noir sur fond clair).
+  const CHAMP_IMG = /\/trophy-([A-Z0-9]+)-coloredBackground/;
+  const CHAMPS = {
+    L1: { c: '#2a5bff' }, L2: { c: '#00d9b8', inv: true }, PL: { c: '#9a16b5' }, ES: { c: '#e0412f' },
+    LDC: { c: '#3550e6' }, LS: { c: '#3fc13f' }, IT: { c: '#1a73e8' }, BL: { c: '#e2001a' },
+  };
+  const DONE = /(Ligue terminée|Tournoi terminé|Saison à relancer|Éliminé|Eliminé|Relancer ma ligue)/;
+  function champBackground(img) {
+    if (location.pathname !== '/') return;            // Mon MPG uniquement
+    const a = img.closest('a[href]');
+    const box = a && a.firstElementChild;
+    if (!box || !box.contains(img) || box.offsetWidth < 200) return;
+    // Illustration d'origine : une image aussi large (ou presque) que la carte
+    if ([...box.querySelectorAll('img')].some(i => i.offsetWidth >= box.offsetWidth * .8)) {
+      if (box.getAttribute('data-mpg-champbg') !== null) box.removeAttribute('data-mpg-champbg');
+      return;
+    }
+    const code = img.src.match(CHAMP_IMG)[1];
+    const champ = CHAMPS[code] || { c: '#4054cc' };
+    const href = a.getAttribute('href');
+    const text = box.innerText;
+    const kind = /express/i.test(text) ? 'express' : /\/tournament\//.test(href) || /\bTournoi\b/.test(text) ? 'tournament' : 'league';
+    // Mes compétitions : avatar à gauche, en-tête d'état ; publiques : avatar centré en haut
+    const layout = box.children.length >= 4 ? 'mine' : 'public';
+    if (box.getAttribute('data-mpg-champbg') !== layout) box.setAttribute('data-mpg-champbg', layout);
+    if (box.getAttribute('data-mpg-cb-kind') !== kind) box.setAttribute('data-mpg-cb-kind', kind);
+    box.toggleAttribute('data-mpg-cb-inv', !!champ.inv);
+    box.toggleAttribute('data-mpg-cb-done', DONE.test(text));
+    box.style.setProperty('--mpg-cb-c', champ.c);
+    box.style.setProperty('--mpg-cb-img', `url("${img.src}")`);
   }
 
   // Badge d'état posé dans le coin haut-gauche d'une carte arrondie
@@ -565,6 +647,7 @@
 
     growScrollers();
     homeLayout();
+    if (location.pathname === '/') for (const i of $$('#root img')) if (CHAMP_IMG.test(i.src)) champBackground(i);
     profileLayout();
     if (location.pathname !== '/') $$('[data-mpg-title]').forEach(e => e.removeAttribute('data-mpg-title'));
 
