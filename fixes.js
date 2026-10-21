@@ -110,7 +110,7 @@
 
     /* --- Messagerie : conversations lues lisibles --- */
     [data-mpg-read] { opacity: 1 !important; }
-    [data-mpg-read] * { color: #b9bcc4 !important; }
+    html:not(.light) [data-mpg-read] * { color: #b9bcc4 !important; }
 
     /* --- Mise en page : bas de Mon MPG, adapté à la largeur disponible ---
        data-mpg-size (posé par un ResizeObserver) : l ≥ 1000 px, m ≥ 620 px, s en dessous.
@@ -128,11 +128,62 @@
     }
     [data-mpg-homecol]:is([data-mpg-size="m"], [data-mpg-size="l"]) > [data-mpg-homecell] { grid-column: auto; }
     [data-mpg-homecol][data-mpg-size="m"] > [data-mpg-homecell="wide"] { grid-column: 1 / -1; }
+    /* « Nouvelle compétition » remontée dans le bandeau : officielles | privée */
+    [data-mpg-homecol][data-mpg-acts-out]:is([data-mpg-size="m"], [data-mpg-size="l"]) {
+      grid-template-columns: minmax(260px, .8fr) minmax(0, 1.6fr);
+    }
+    [data-mpg-homecol][data-mpg-acts-out][data-mpg-size="m"] > [data-mpg-homecell="wide"] { grid-column: auto; }
 
-    /* Créer / Rejoindre / Suivre : réparties sur toute la colonne */
-    [data-mpg-tiles] {
-      display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr));
-      justify-items: center; column-gap: 8px; width: 100% !important;
+    /* --- Créer / Rejoindre / Suivre : boutons compacts identiques (mascotte + libellé) ---
+       banner : boutons à nous, posés à droite dans le bandeau « Mon MPG » (≈ 220 px gagnés) ;
+                la section d'origine est masquée et reçoit les clics.
+       inline : à défaut (pas de bandeau, ou trop étroit), les tuiles restylées sur place. */
+    [data-mpg-acts="banner"] { display: none !important; }
+    .mpg-acts {
+      position: absolute; top: 50%; right: 20px; transform: translateY(-50%); z-index: 1;
+      display: flex; gap: 8px; margin: 0; padding: 0;
+    }
+    .mpg-act, [data-mpg-act] {
+      position: relative; display: flex !important; flex-direction: row !important; align-items: center !important;
+      gap: 8px; width: auto !important; height: 36px !important; padding: 0 14px 0 6px !important; margin: 0;
+      border: 0; border-radius: 6px; cursor: pointer; transition: background-color .15s, box-shadow .15s;
+      color: #fff; font: 600 14px/1 Avenir-Medium, system-ui, sans-serif; white-space: nowrap;
+      background-color: var(--colors-surface-primary, #262626);
+      box-shadow: inset 0 0 0 1px var(--colors-border-disable, #444955);
+    }
+    .mpg-act {
+      background-color: rgba(8, 10, 18, .45); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3);
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .mpg-act:hover, [data-mpg-act]:hover {
+      background-color: rgba(255, 255, 255, .16); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55);
+    }
+    .mpg-act:active { transform: translateY(1px); }
+    .mpg-act:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .mpg-act img { width: 26px; height: 26px; object-fit: contain; flex: none; }
+
+    [data-mpg-acts="inline"] {
+      flex-direction: row !important; align-items: center !important; flex-wrap: wrap; gap: 8px 16px;
+    }
+    [data-mpg-acts="inline"] > h5 { margin: 0 !important; width: auto !important; }
+    [data-mpg-acts] [data-mpg-tiles] {
+      display: flex !important; flex-direction: row !important; flex-wrap: wrap;
+      gap: 8px; width: auto !important; height: auto !important;
+    }
+    /* Tuile d'origine (mode inline) : elle devient l'icône ; son ::after couvre tout le bouton */
+    [data-mpg-act] > :first-child {
+      position: static !important; width: 26px !important; height: 26px !important; flex: none;
+      border: 0 !important; border-radius: 0 !important; background: none !important; padding: 0 !important;
+    }
+    [data-mpg-act] > :first-child::after { content: ""; position: absolute; inset: 0; border-radius: 6px; }
+    [data-mpg-act] > :first-child * {
+      width: 26px !important; height: 26px !important; min-width: 0 !important; object-fit: contain;
+    }
+    html body [data-mpg-act] > [tabindex]:focus-visible { outline: none !important; }
+    [data-mpg-act]:has(> :first-child:focus-visible) { outline: 2px solid #fff; outline-offset: 2px; }
+    [data-mpg-act] > :last-child {
+      width: auto !important; height: auto !important; margin: 0 !important; white-space: nowrap;
+      color: #fff !important; font: 600 14px/1 Avenir-Medium, system-ui, sans-serif !important;
     }
     /* Compet' officielles : la carte occupe la colonne (défile s'il y en a plusieurs) */
     [data-mpg-offscroll], [data-mpg-offrow] { width: 100% !important; }
@@ -262,7 +313,7 @@
     if (shown === ':') countdownUnits(el);
     if (shown === 'Mon MPG' || TOP_SECTIONS.test(shown)) checkCrumb(el);
     // Mises en page appliquées dès l'insertion du titre de section (pas de saut visible)
-    if (/^Rejoins un tournoi public$/i.test(shown)) queueMicrotask(homeLayout);
+    if (/^(Rejoins un tournoi public|Nouvelle compétition)$/i.test(shown)) queueMicrotask(homeLayout);
     if (/^Ma collection de maillot/i.test(shown)) queueMicrotask(profileLayout);
     contextualText(el, shown);
   }
@@ -545,9 +596,88 @@
   // Bas de Mon MPG : « Nouvelle compétition », « Compet' officielles » et « J'ai un code »
   // côte à côte ; ligues et tournois publics en grille sur toute la largeur.
   const HOME_ATTRS = ['data-mpg-homecol', 'data-mpg-homecell', 'data-mpg-size', 'data-mpg-tiles', 'data-mpg-offscroll',
-    'data-mpg-offrow', 'data-mpg-cardview', 'data-mpg-cardscroll', 'data-mpg-cardrow'];
+    'data-mpg-offrow', 'data-mpg-cardview', 'data-mpg-cardscroll', 'data-mpg-cardrow',
+    'data-mpg-acts', 'data-mpg-act', 'data-mpg-acts-out'];
   const homeRO = new ResizeObserver(entries => { for (const e of entries) sizeHome(e.target); });
   let homeCol = null;
+
+  // Créer / Rejoindre / Suivre : trois boutons compacts identiques. Quand il y a la place à
+  // côté du titre, ce sont des <button> à nous, posés à droite dans le bandeau « Mon MPG »
+  // (la section d'origine, masquée, reçoit les clics : le site garde la main sur l'action).
+  // La section ne peut pas être déplacée elle-même : ses ancêtres (ScrollView) la rognent.
+  // Sinon (pas de bandeau, ou bandeau trop étroit) : les tuiles restylées sur place.
+  let homeActs = null, homeBar = null;
+  const actsRO = new ResizeObserver(() => placeActions());
+  const tilesOf = sec => [...(sec.children[1]?.children || [])];
+  const labelOf = t => t.innerText.trim();
+  const homeBanner = () => $$('[data-mpg-dyn]').find(b => b.offsetWidth > 600 && b.getBoundingClientRect().top + scrollY < 400);
+
+  function homeActions(sec) {
+    const tiles = tilesOf(sec);
+    if (tiles.length < 2 || tiles.length > 4) return;
+    setAttr(sec.children[1], 'data-mpg-tiles', '');
+    for (const t of tiles) setAttr(t, 'data-mpg-act', '');
+    homeActs = sec;
+    placeActions();
+  }
+
+  function buildBar(banner) {
+    const tiles = tilesOf(homeActs);
+    const sig = tiles.map(labelOf).join('|');
+    if (!homeBar) {
+      homeBar = document.createElement('div');
+      homeBar.className = 'mpg-acts';
+      homeBar.setAttribute('role', 'group');
+      homeBar.setAttribute('aria-label', 'Nouvelle compétition');
+    }
+    if (homeBar.dataset.sig !== sig) {
+      homeBar.textContent = '';
+      for (const t of tiles) {
+        const label = labelOf(t);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mpg-act';
+        const src = t.querySelector('img')?.src;
+        if (src) { const i = document.createElement('img'); i.src = src; i.alt = ''; btn.append(i); }
+        btn.append(label);
+        // Tuile retrouvée au moment du clic (React peut l'avoir remplacée)
+        btn.addEventListener('click', () => {
+          const tile = homeActs && tilesOf(homeActs).find(x => labelOf(x) === label);
+          tile?.firstElementChild?.click();
+        });
+        homeBar.append(btn);
+      }
+      homeBar.dataset.sig = sig;
+    }
+    if (homeBar.parentElement !== banner) { banner.append(homeBar); actsRO.disconnect(); actsRO.observe(banner); }
+  }
+
+  function removeBar() {
+    homeBar?.remove();
+    actsRO.disconnect();
+  }
+
+  function placeActions() {
+    const sec = homeActs;
+    if (!sec || !sec.isConnected) return removeBar();
+    const banner = homeBanner();
+    let mode = 'inline';
+    if (banner) {
+      buildBar(banner);
+      const br = banner.getBoundingClientRect(), r = homeBar.getBoundingClientRect();
+      const title = [...banner.querySelectorAll('*')]
+        .filter(e => !homeBar.contains(e) && !e.childElementCount && e.textContent.trim() && e.offsetWidth)
+        .map(e => e.getBoundingClientRect());
+      const clash = title.some(t => t.right + 24 > r.left && t.left < r.right && t.bottom > r.top && t.top < r.bottom);
+      if (!clash && r.height <= br.height - 16) mode = 'banner';
+    }
+    if (mode !== 'banner') removeBar();
+    setAttr(sec, 'data-mpg-acts', mode);
+    sec.parentElement.toggleAttribute('data-mpg-acts-out', mode === 'banner');
+  }
+  addEventListener('resize', () => homeActs && placeActions());
+  // Changement de page : retirer les boutons du bandeau tout de suite (React peut le réutiliser)
+  if (window.navigation) navigation.addEventListener('currententrychange', () => queueMicrotask(homeLayout));
 
   // Taille de la colonne → disposition. Cartes publiques (≥ 260 px + 16 px d'écart) :
   // en grille si toute la rangée tient (3 par ligne au plus loin), sinon défilement.
@@ -567,14 +697,20 @@
   }
 
   function homeLayout() {
-    if (location.pathname !== '/') {
+    // (les fenêtres « Créer / Rejoindre… » s'ouvrent en /modal/… par-dessus Mon MPG)
+    if (location.pathname !== '/' && !location.pathname.startsWith('/modal/')) {
       for (const a of HOME_ATTRS) $$(`[${a}]`).forEach(e => e.removeAttribute(a));
       if (homeCol) { homeRO.unobserve(homeCol); homeCol = null; }
+      homeActs = null; removeBar();
       return;
     }
     const h = $$('#root h5').find(x => /^nouvelle compétition$/i.test(x.textContent.trim()));
     const col = h && h.parentElement && h.parentElement.parentElement;
-    if (!col || col.children.length < 5) return;
+    if (!col) { homeActs = null; removeBar(); return; }
+    homeActions(h.parentElement);
+    // Grille du bas de page : seulement quand les sections y sont regroupées (selon les
+    // comptes, le site les place en bas, ou « Nouvelle compétition » tout en haut)
+    if (col.children.length < 5) return;
     col.setAttribute('data-mpg-homecol', '');
     if (homeCol !== col) {
       if (homeCol) homeRO.unobserve(homeCol);
@@ -585,8 +721,6 @@
       const t = k.querySelector('h5')?.textContent.trim() || '';
       if (/^nouvelle compétition$/i.test(t)) {
         k.setAttribute('data-mpg-homecell', '');
-        const tiles = k.children[1];                            // Créer / Rejoindre / Suivre
-        if (tiles && tiles.children.length >= 2) tiles.setAttribute('data-mpg-tiles', '');
       } else if (/officielles/i.test(t)) {
         k.setAttribute('data-mpg-homecell', '');
         const scroll = k.children[1]?.firstElementChild;       // zone qui défile
@@ -677,7 +811,10 @@
     let added = false;
     for (const r of records) {
       if (r.type === 'characterData') fixText(r.target);
-      else if (r.addedNodes.length) { added = true; for (const n of r.addedNodes) scan(n); }
+      else for (const n of r.addedNodes) {
+        if (n === homeBar) continue;               // nos boutons du bandeau (évite une boucle)
+        added = true; scan(n);
+      }
     }
     if (added) scheduleFull(); // pas pour les simples tics de compte à rebours
   });

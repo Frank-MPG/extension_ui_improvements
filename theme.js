@@ -127,4 +127,90 @@
   // (pas characterData : les tics de compte à rebours n'ajoutent ni règle ni élément)
   mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   addEventListener('load', () => { patchAll(); retryPending(); });
+
+  // ===========================================================================
+  // 3. Bouton clair / sombre dans le header
+  // ===========================================================================
+  // Le site applique son thème par une classe sur <html> (light / dark ; aucune = automatique,
+  // selon le système) et le mémorise dans localStorage « mmkv.default\theme »
+  // (light | dark | automatic), relu au chargement. Changer la classe seule ne suffit pas :
+  // les composants déjà affichés gardent des couleurs calculées en JS (textes blancs sur
+  // blanc…). On enregistre donc le choix et on recharge la page.
+  // Le mode automatique reste disponible dans Réglages → Thème.
+  const THEME_KEY = 'mmkv.default\\theme';
+  const SUN = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  const MOON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>';
+  const dark = () => root.classList.contains('dark') ||
+    (!root.classList.contains('light') && matchMedia('(prefers-color-scheme: dark)').matches);
+
+  const tstyle = document.createElement('style');
+  tstyle.textContent = `
+    .mpg-theme-btn {
+      display: flex; align-items: center; justify-content: center; flex: none;
+      width: 34px; height: 30px; margin: 0; padding: 0; border: 0; border-radius: 6px;
+      background: transparent; color: #fff; cursor: pointer; transition: background-color .15s;
+    }
+    .mpg-theme-btn:hover { background: rgba(255, 255, 255, .14); }
+    .mpg-theme-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .mpg-theme-btn svg { display: block; }
+    .mpg-theme-btn:disabled { cursor: progress; }
+    html[data-mpg-theme-switch] body { opacity: 0; transition: opacity .12s; }
+  `;
+  root.appendChild(tstyle);
+
+  let btn = null;
+  function makeButton() {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mpg-theme-btn';
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const next = dark() ? 'light' : 'dark';
+      try { localStorage.setItem(THEME_KEY, next); } catch { return; /* stockage indisponible */ }
+      btn.disabled = true;
+      root.setAttribute('data-mpg-theme-switch', '');   // fondu le temps du rechargement
+      setTimeout(() => location.reload(), 120);
+    });
+    btn.addEventListener('mousedown', e => e.stopPropagation()); // ne pas fermer/ouvrir les menus
+    paintButton();
+  }
+  function paintButton() {
+    if (!btn) return;
+    const d = dark();
+    const label = d ? 'Passer en mode clair' : 'Passer en mode sombre';
+    if (btn.getAttribute('aria-label') === label) return;
+    btn.innerHTML = d ? SUN : MOON;            // icône = le mode vers lequel on bascule
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+
+  // Emplacement : groupe de droite du header (Menu, notifications), en premier.
+  // Le header est rendu par React (et son fond change avec le thème) : on le retrouve par
+  // son libellé « Menu », et on y remet le bouton s'il a disparu.
+  let group = null, lastSearch = 0, retry = 0;
+  function placeButton() {
+    if (btn && btn.isConnected && group && group.isConnected && group.firstElementChild === btn) return;
+    // Recherche limitée à une toutes les 300 ms (pages qui changent beaucoup)
+    if (performance.now() - lastSearch < 300) {
+      if (!retry) retry = setTimeout(() => { retry = 0; placeButton(); }, 320);
+      return;
+    }
+    lastSearch = performance.now();
+    const menu = [...document.querySelectorAll('#root div')]
+      .find(d => !d.childElementCount && d.textContent.trim() === 'Menu' && d.getBoundingClientRect().top < 120);
+    if (!menu) return;
+    let row = menu.parentElement;
+    while (row && row !== document.body && !row.querySelector('a[tabindex="0"]')) row = row.parentElement;
+    group = row && row !== document.body ? [...row.children].find(c => c.contains(menu)) : null;
+    if (!group || group === menu) return;
+    if (!btn) makeButton();
+    if (group.firstElementChild !== btn) group.prepend(btn);
+  }
+
+  let raf = 0;
+  new MutationObserver(() => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; placeButton(); paintButton(); });
+  }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintButton);
 })();
