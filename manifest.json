@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "MPG – Thème et correctifs UI",
-  "version": "1.9.1",
-  "description": "Bandeaux mosaïque animés par page, thème ardoise et correctifs UX / accessibilité sur mpg.football.",
+  "version": "1.10.0",
+  "description": "Bandeaux mosaïque animés par page, thème ardoise et correctifs UX / accessibilité sur mpg.football et dev.mpg.football.",
   "homepage_url": "https://github.com/frank-mpg/extension_ui_improvements",
   "icons": {
     "16": "icon16.png",
@@ -22,7 +22,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://mpg.football/*"
+        "https://mpg.football/*",
+        "https://dev.mpg.football/*"
       ],
       "js": [
         "theme.js",
